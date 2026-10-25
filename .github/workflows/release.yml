@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    tags:
+      - "v*+mc*"        # 例如 v0.33.0+mc1.21.1
+  workflow_dispatch:
+    inputs:
+      mod_version:
+        description: "模组版本, 例如 0.33.0"
+        required: true
+      mc:
+        description: "Minecraft 版本, 例如 1.21.1"
+        required: true
+        default: "1.21.1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: 解析版本号
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MOD="${{ github.event.inputs.mod_version }}"
+            MC="${{ github.event.inputs.mc }}"
+          else
+            TAG="${GITHUB_REF_NAME#v}"       # 0.33.0+mc1.21.1
+            MOD="${TAG%%+mc*}"
+            MC="${TAG##*+mc}"
+          fi
+          echo "mod=$MOD" >> "$GITHUB_OUTPUT"
+          echo "mc=$MC" >> "$GITHUB_OUTPUT"
+          echo "模组 $MOD / MC $MC"
+
+      - name: 拉取上游 en_us.json 作为基准
+        run: python3 tools/fetch_upstream.py --mc "${{ steps.ver.outputs.mc }}"
+
+      - name: 校验键、占位符、空值
+        run: python3 tools/check_keys.py --mc "${{ steps.ver.outputs.mc }}"
+
+      - name: 术语与空白检查
+        run: python3 tools/normalize_terms.py --mc "${{ steps.ver.outputs.mc }}" --check
+
+      - name: 打包资源包
+        run: python3 tools/build.py --mod-version "${{ steps.ver.outputs.mod }}" --mc "${{ steps.ver.outputs.mc }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resourcepack
+          path: dist/*.zip
+
+      - name: 发布到 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
