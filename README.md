@@ -38,6 +38,8 @@ tools/migrate_keys.py           # 旧汉化文件按上游改名规则迁移到�
 tools/compose.py                # 合成最终 zh_cn.json(基准 + 新译, 按上游键序)
 tools/normalize_terms.py        # 术语与空白统一(规则见 docs/glossary.md)
 tools/build.py                  # 打包 dist/*.zip
+tools/publish_modrinth.py       # 发布到 Modrinth(令牌走 pass:modrinth/token, 支持 --dry-run)
+changelog/<版本号>.md            # 该版本的更新说明(发布时自动带上)
 docs/glossary.md                # 术语对照表
 .github/workflows/release.yml   # 打 tag 自动校验 + 打包 + 发 Release
 ```
