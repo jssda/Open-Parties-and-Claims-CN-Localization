@@ -3,16 +3,24 @@ name: build
 on:
   push:
     tags:
-      - "v*+mc*"        # 例如 v0.33.0+mc1.21.1
+      - "v*"
   workflow_dispatch:
     inputs:
       mod_version:
         description: "模组版本, 例如 0.33.0"
-        required: true
+        required: false
+        default: "0.33.0"
       mc:
         description: "Minecraft 版本, 例如 1.21.1"
-        required: true
+        required: false
         default: "1.21.1"
+      publish_release:
+        description: "是否创建 GitHub Release (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,22 +30,28 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
       - name: 解析版本号
         id: ver
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MOD="${{ github.event.inputs.mod_version }}"
-            MC="${{ github.event.inputs.mc }}"
+            MOD="${{ inputs.mod_version }}"
+            MC="${{ inputs.mc }}"
+            REL="${{ inputs.publish_release }}"
           else
-            TAG="${GITHUB_REF_NAME#v}"       # 0.33.0+mc1.21.1
+            TAG="${GITHUB_REF_NAME#v}"
             MOD="${TAG%%+mc*}"
             MC="${TAG##*+mc}"
+            REL="true"
           fi
+          [ -n "$MOD" ] || MOD="0.33.0"
+          [ -n "$MC" ] || MC="1.21.1"
+          [ -n "$REL" ] || REL="false"
           echo "mod=$MOD" >> "$GITHUB_OUTPUT"
           echo "mc=$MC" >> "$GITHUB_OUTPUT"
-          echo "模组 $MOD / MC $MC"
+          echo "release=$REL" >> "$GITHUB_OUTPUT"
+          echo "模组 $MOD / MC $MC / release=$REL"
 
       - name: 拉取上游 en_us.json 作为基准
         run: python3 tools/fetch_upstream.py --mc "${{ steps.ver.outputs.mc }}"
@@ -53,11 +67,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: resourcepack
+          name: Open-Parties-and-Claims-CN-${{ steps.ver.outputs.mod }}-mc${{ steps.ver.outputs.mc }}
           path: dist/*.zip
 
       - name: 发布到 GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.ver.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
